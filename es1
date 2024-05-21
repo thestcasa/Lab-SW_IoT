@@ -1,0 +1,64 @@
+import cherrypy
+import json
+import time
+
+class TemperatureConverter:
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def converter(self, value=None, originalUnit=None, targetUnit=None):
+        if value is None or originalUnit is None or targetUnit is None:
+            raise cherrypy.HTTPError(400, "Missing parameters")
+
+        try:
+            value = float(value)
+        except ValueError:
+            raise cherrypy.HTTPError(400, "Invalid value parameter")
+
+        originalUnit = originalUnit.upper()
+        targetUnit = targetUnit.upper()
+
+        if originalUnit not in ['C', 'K', 'F'] or targetUnit not in ['C', 'K', 'F']:
+            raise cherrypy.HTTPError(400, "Invalid unit of measurement")
+
+        converted_value = self.convert_temperature(value, originalUnit, targetUnit)
+
+        result = {
+            "original_value": value,
+            "original_unit": originalUnit,
+            "converted_value": converted_value,
+            "target_unit": targetUnit
+        }
+
+        return result
+
+    def convert_temperature(self, value, originalUnit, targetUnit):
+        if originalUnit == targetUnit:
+            return value
+
+        if originalUnit == 'C':
+            if targetUnit == 'K':
+                return value + 273.15
+            elif targetUnit == 'F':
+                return (value * 9/5) + 32
+
+        if originalUnit == 'K':
+            if targetUnit == 'C':
+                return value - 273.15
+            elif targetUnit == 'F':
+                return (value - 273.15) * 9/5 + 32
+
+        if originalUnit == 'F':
+            if targetUnit == 'C':
+                return (value - 32) * 5/9
+            elif targetUnit == 'K':
+                return (value - 32) * 5/9 + 273.15
+
+        return None
+
+if __name__ == '__main__':
+    cherrypy.config.update({
+        'server.socket_host': '127.0.0.1',
+        'server.socket_port': 8080,
+        'log.screen': True
+    })
+    cherrypy.quickstart(TemperatureConverter(), '/')

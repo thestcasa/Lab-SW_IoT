@@ -1,0 +1,74 @@
+import cherrypy
+import json
+import time
+
+class TemperatureConverter:
+    def convert_temperature(self, value, original_unit, target_unit):
+        if original_unit == target_unit:
+            return value
+
+        if original_unit == 'C':
+            if target_unit == 'K':
+                return value + 273.15
+            elif target_unit == 'F':
+                return (value * 9/5) + 32
+
+        if original_unit == 'K':
+            if target_unit == 'C':
+                return value - 273.15
+            elif target_unit == 'F':
+                return (value - 273.15) * 9/5 + 32
+
+        if original_unit == 'F':
+            if target_unit == 'C':
+                return (value - 32) * 5/9
+            elif target_unit == 'K':
+                return (value - 32) * 5/9 + 273.15
+
+        return None
+
+class TemperatureWebService:
+    def __init__(self):
+        self.converter = TemperatureConverter()
+        self.conversion_history = []
+
+    @cherrypy.expose
+    @cherrypy.tools.json_in()
+    @cherrypy.tools.json_out()
+    def convert_list(self):
+        if cherrypy.request.method != 'POST':
+            raise cherrypy.HTTPError(405, "Method Not Allowed")
+
+        input_data = cherrypy.request.json
+
+        if 'values' not in input_data or 'originalUnit' not in input_data or 'targetUnit' not in input_data:
+            raise cherrypy.HTTPError(400, "Missing parameters")
+
+        values = input_data['values']
+        original_unit = input_data['originalUnit'].upper()
+        target_unit = input_data['targetUnit'].upper()
+
+        if original_unit not in ['C', 'K', 'F'] or target_unit not in ['C', 'K', 'F']:
+            raise cherrypy.HTTPError(400, "Invalid unit of measurement")
+
+        converted_values = [self.converter.convert_temperature(value, original_unit, target_unit) for value in values]
+
+        result = {
+            "values": values,
+            "targetValues": converted_values,
+            "originalUnit": original_unit,
+            "targetUnit": target_unit,
+            "timestamp": int(time.time())
+        }
+
+        self.conversion_history.append(result)
+
+        return result
+
+if __name__ == '__main__':
+    cherrypy.config.update({
+        'server.socket_host': '127.0.0.1',
+        'server.socket_port': 8080,
+        'log.screen': True
+    })
+    cherrypy.quickstart(TemperatureWebService(), '/')
